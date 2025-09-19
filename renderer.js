@@ -17,8 +17,8 @@ const exportTextButton = document.getElementById("exportText");
 const exportJsonButton = document.getElementById("exportJson");
 
 const MAX_RECORDING_MS = 180_000;
-const LIVE_CHUNK_MS = 3_000;
-const LIVE_RETRY_DELAY_MS = 600;
+const LIVE_CHUNK_MS = 1_000;
+const LIVE_RETRY_DELAY_MS = 300;
 const MAX_KNOWLEDGE_CHARS = 25_000;
 const KNOWLEDGE_SNIPPET_LIMIT = 1_200;
 const STATUS_RESET_DELAY_MS = 4_000;
@@ -28,13 +28,13 @@ let recordingTimeout = null;
 let chunks = [];
 let isProcessing = false;
 let apiKeyAvailable = false;
-let isLiveTranscribing = false;
-let liveTranscriptionQueued = false;
 let liveTranscriptText = "";
 let isStoppingRecord = false;
 let lastKnownMimeType = "audio/webm";
 let savedTranscripts = [];
 let knowledgeBase = "";
+const liveChunkQueue = [];
+let isProcessingLiveChunk = false;
 
 const API_KEY_STORAGE_KEY = "desktopTranscriber.openaiKey";
 const TRANSCRIPTS_STORAGE_KEY = "desktopTranscriber.transcripts";
@@ -403,11 +403,11 @@ function resetState(options = {}) {
   mediaRecorder = null;
   mediaStream = null;
   chunks = [];
-  liveTranscriptionQueued = false;
-  isLiveTranscribing = false;
   liveTranscriptText = "";
   isStoppingRecord = false;
   lastKnownMimeType = "audio/webm";
+  liveChunkQueue.length = 0;
+  isProcessingLiveChunk = false;
   clearRecordingTimeout();
   setButtons({ recording: false, processing: false });
   isProcessing = false;
@@ -416,48 +416,55 @@ function resetState(options = {}) {
   }
 }
 
-async function requestLiveTranscription() {
-  if (isProcessing || isStoppingRecord || !apiKeyAvailable) {
+function enqueueLiveChunk(blob) {
+  if (!blob || !blob.size || isStoppingRecord) {
     return;
   }
-  if (!chunks.length) {
-    return;
-  }
-  if (isLiveTranscribing) {
-    liveTranscriptionQueued = true;
+  liveChunkQueue.push(blob);
+  processLiveChunkQueue();
+}
+
+async function processLiveChunkQueue() {
+  if (
+    isProcessingLiveChunk ||
+    !liveChunkQueue.length ||
+    isStoppingRecord ||
+    !apiKeyAvailable
+  ) {
     return;
   }
 
-  isLiveTranscribing = true;
+  const blob = liveChunkQueue.shift();
+  if (!blob || !blob.size) {
+    return processLiveChunkQueue();
+  }
+
+  isProcessingLiveChunk = true;
+
   try {
-    const audioBlob = new Blob(chunks, { type: lastKnownMimeType });
-    const buffer = await audioBlob.arrayBuffer();
-    const result = await window.electronAPI.transcribePartial(buffer, audioBlob.type);
+    const buffer = await blob.arrayBuffer();
+    const result = await window.electronAPI.transcribePartial(buffer, blob.type);
 
     if (result?.ok) {
-      liveTranscriptText = result.text?.trim() || "";
+      const text = result.text?.trim();
+      if (text) {
+        liveTranscriptText = liveTranscriptText ? `${liveTranscriptText} ${text}` : text;
+        liveTranscriptOutput.textContent = liveTranscriptText;
+      }
       if (mediaRecorder?.state === "recording") {
-        liveTranscriptOutput.textContent = liveTranscriptText || "Listening…";
         setStatus("Recording… transcribing live");
       }
-      if (liveTranscriptText) {
-        setKeyStatus("API key ready.", "success");
-      }
-    } else if (result?.error) {
-      if (/api key/i.test(result.error)) {
-        apiKeyAvailable = false;
-        setKeyStatus("Add a valid API key to continue.", "error");
-      }
+      setKeyStatus("API key ready.", "success");
+    } else if (result?.error && /api key/i.test(result.error)) {
+      apiKeyAvailable = false;
+      setKeyStatus("Add a valid API key to continue.", "error");
     }
   } catch (error) {
-    // Swallow live errors to avoid spamming the UI; final transcription will surface issues.
+    showTransientStatus("Live transcription stalled. Retrying…");
   } finally {
-    isLiveTranscribing = false;
-    if (liveTranscriptionQueued && !isStoppingRecord) {
-      liveTranscriptionQueued = false;
-      setTimeout(() => {
-        requestLiveTranscription();
-      }, LIVE_RETRY_DELAY_MS);
+    isProcessingLiveChunk = false;
+    if (liveChunkQueue.length && !isStoppingRecord) {
+      setTimeout(processLiveChunkQueue, LIVE_RETRY_DELAY_MS);
     }
   }
 }
@@ -531,9 +538,7 @@ async function startRecording() {
         if (event.data.type) {
           lastKnownMimeType = event.data.type;
         }
-        if (!isStoppingRecord) {
-          requestLiveTranscription();
-        }
+        enqueueLiveChunk(event.data);
       }
     });
 
