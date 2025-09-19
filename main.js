@@ -59,9 +59,9 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
   const systemPrompt =
     "You are an assistant that extracts interview prompts from a transcript and answers them accurately. " +
     "Prompts may be phrased as questions or statements (for example, 'Tell me about your experience'). " +
-    "Use any provided knowledge base when answering, but do not fabricate. " +
-    "If the knowledge base does not contain the requested information, reply with 'Not specified in knowledge base.' for that prompt. " +
-    "Respond strictly as JSON with the shape {\"answers\":[{\"question\":string,\"answer\":string}]}. " +
+    "Use any provided knowledge base when answering and note when the knowledge base was used. " +
+    "If the knowledge base does not contain the requested information, provide a concise answer from your own knowledge and mention that the answer came from general knowledge. " +
+    "Respond strictly as JSON with the shape {\"answers\":[{\"question\":string,\"answer\":string,\"source\":\"knowledge_base\"|\"general\"}]}. " +
     "If there are no prompts that require answers, respond with {\"answers\":[]}.";
 
   const cleanedKnowledge = knowledgeBase ? knowledgeBase.slice(0, 25_000) : "";
@@ -71,7 +71,7 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
   }
   sections.push(`Transcript:\n${transcript}`);
   sections.push(
-    "Instructions: Identify each distinct question or request for information in the transcript and answer it concisely in one or two sentences. Use the knowledge base when relevant; if information is missing, respond with 'Not specified in knowledge base.'"
+    "Instructions: Identify each distinct question or request for information in the transcript and answer it concisely in one or two sentences. Use the knowledge base when relevant and mark those answers with source \"knowledge_base\". If the knowledge base lacks the information, answer from your general understanding and mark the source as \"general\"."
   );
 
   const userPrompt = sections.join("\n\n");
@@ -112,8 +112,9 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
       if (!item || typeof item !== "object") return null;
       const question = typeof item.question === "string" ? item.question.trim() : "";
       const answer = typeof item.answer === "string" ? item.answer.trim() : "";
+      const source = item.source === "knowledge_base" ? "knowledge_base" : "general";
       if (!question || !answer) return null;
-      return { question, answer };
+      return { question, answer, source };
     })
     .filter(Boolean);
 }

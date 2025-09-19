@@ -264,7 +264,8 @@ function renderHistory() {
 
         const aLabel = document.createElement("p");
         aLabel.className = "history__answer";
-        aLabel.textContent = answer;
+        const source = qa.source === "knowledge_base" ? "knowledge base" : "general knowledge";
+        aLabel.textContent = `${answer} (${source})`;
 
         qaItem.appendChild(qLabel);
         qaItem.appendChild(aLabel);
