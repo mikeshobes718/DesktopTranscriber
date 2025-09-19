@@ -57,10 +57,11 @@ async function transcribePayload({ buffer, mimeType }) {
 async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
   const client = getClient();
   const systemPrompt =
-    "You are an assistant that extracts questions from a transcript and answers them accurately. " +
+    "You are an assistant that extracts interview prompts from a transcript and answers them accurately. " +
+    "Prompts may be phrased as questions or statements (for example, 'Tell me about your experience'). " +
     "Use any provided knowledge base when answering, but do not fabricate. " +
     "Respond strictly as JSON with the shape {\"answers\":[{\"question\":string,\"answer\":string}]}. " +
-    "If there are no questions, respond with {\"answers\":[]}.";
+    "If there are no prompts that require answers, respond with {\"answers\":[]}.";
 
   const cleanedKnowledge = knowledgeBase ? knowledgeBase.slice(0, 25_000) : "";
   const sections = [];
@@ -69,7 +70,7 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
   }
   sections.push(`Transcript:\n${transcript}`);
   sections.push(
-    "Instructions: Identify each distinct question in the transcript and answer it concisely in one or two sentences."
+    "Instructions: Identify each distinct question or request for information in the transcript and answer it concisely in one or two sentences."
   );
 
   const userPrompt = sections.join("\n\n");

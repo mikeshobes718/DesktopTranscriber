@@ -40,6 +40,39 @@ const API_KEY_STORAGE_KEY = "desktopTranscriber.openaiKey";
 const TRANSCRIPTS_STORAGE_KEY = "desktopTranscriber.transcripts";
 const KNOWLEDGE_STORAGE_KEY = "desktopTranscriber.knowledge";
 
+function looksLikeQuestion(text) {
+  if (!text) return false;
+  if (/\?/u.test(text)) {
+    return true;
+  }
+
+  const normalized = text.toLowerCase();
+  const phrases = [
+    "tell me about",
+    "describe",
+    "walk me through",
+    "explain",
+    "share",
+    "talk about",
+    "give me an example",
+    "give me examples",
+    "what would you",
+    "how would you",
+    "how do you",
+    "why did you",
+    "why would you",
+    "please provide",
+    "could you",
+    "can you",
+    "let me know",
+    "i'd like to hear",
+    "i would like to hear",
+    "tell us",
+  ];
+
+  return phrases.some((phrase) => normalized.includes(phrase));
+}
+
 function setStatus(message) {
   statusText.textContent = message ?? "";
 }
@@ -259,7 +292,7 @@ function addTranscriptEntry(text) {
     timestamp: new Date().toISOString(),
     text: trimmed,
     title: `Recording ${savedTranscripts.length + 1}`,
-    hasQuestions: /\?/.test(trimmed),
+    hasQuestions: looksLikeQuestion(trimmed),
     pendingAnswers: false,
     answers: [],
     answerError: null,
@@ -806,7 +839,7 @@ function initializeTranscripts() {
             text,
             title: entry?.title || `Recording ${parsed.length - index}`,
             hasQuestions:
-              typeof entry?.hasQuestions === "boolean" ? entry.hasQuestions : /\?/.test(text),
+              typeof entry?.hasQuestions === "boolean" ? entry.hasQuestions : looksLikeQuestion(text),
             pendingAnswers: Boolean(entry?.pendingAnswers),
             answers: Array.isArray(entry?.answers) ? entry.answers : [],
             answerError: typeof entry?.answerError === "string" ? entry.answerError : null,
