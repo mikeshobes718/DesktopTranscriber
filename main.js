@@ -201,8 +201,8 @@ ipcMain.handle("get-api-key-status", async () => ({ hasKey: Boolean(openAIKey) }
 ipcMain.handle("transcribe-audio", async (event, payload) => {
   try {
     const response = await transcribePayload(payload || {});
-
-    return { ok: true, text: response?.text ?? "" };
+    const text = typeof response === "string" ? response : response?.text ?? "";
+    return { ok: true, text };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown transcription error.";
     dialog.showErrorBox("Transcription Failed", message);
@@ -213,7 +213,8 @@ ipcMain.handle("transcribe-audio", async (event, payload) => {
 ipcMain.handle("transcribe-partial", async (event, payload) => {
   try {
     const response = await transcribePayload(payload || {});
-    return { ok: true, text: response?.text ?? "" };
+    const text = typeof response === "string" ? response : response?.text ?? "";
+    return { ok: true, text };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown transcription error.";
     return { ok: false, error: message };
