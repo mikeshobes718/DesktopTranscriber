@@ -439,26 +439,28 @@ async function processLiveChunkQueue() {
     return;
   }
 
-  const blob = liveChunkQueue.shift();
-  if (!blob || !blob.size) {
-    return processLiveChunkQueue();
+  liveChunkQueue.shift();
+
+  const aggregatedBlob = new Blob(chunks, { type: lastKnownMimeType || "audio/webm" });
+  if (!aggregatedBlob.size) {
+    return;
   }
 
   isProcessingLiveChunk = true;
 
   try {
-    const buffer = await blob.arrayBuffer();
+    const buffer = await aggregatedBlob.arrayBuffer();
     const result = await window.electronAPI.transcribePartial(
       buffer,
-      blob.type,
+      aggregatedBlob.type,
       transcriptionLanguage
     );
 
     if (result?.ok) {
       const text = result.text?.trim();
       if (text) {
-        liveTranscriptText = liveTranscriptText ? `${liveTranscriptText} ${text}` : text;
-        liveTranscriptOutput.textContent = liveTranscriptText;
+        liveTranscriptText = text;
+        liveTranscriptOutput.textContent = text;
       }
       if (mediaRecorder?.state === "recording") {
         setStatus("Recording… transcribing live");
