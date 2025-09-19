@@ -62,7 +62,7 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
     "Respond strictly as JSON with the shape {\"answers\":[{\"question\":string,\"answer\":string}]}. " +
     "If there are no questions, respond with {\"answers\":[]}.";
 
-  const cleanedKnowledge = knowledgeBase ? knowledgeBase.slice(0, 8_000) : "";
+  const cleanedKnowledge = knowledgeBase ? knowledgeBase.slice(0, 25_000) : "";
   const sections = [];
   if (cleanedKnowledge) {
     sections.push(`Knowledge Base:\n${cleanedKnowledge}`);

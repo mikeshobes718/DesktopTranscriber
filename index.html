@@ -71,7 +71,11 @@
       <section class="history">
         <div class="history__header">
           <span class="label">Saved Transcripts</span>
-          <button id="clearHistory" class="secondary" type="button">Clear History</button>
+          <div class="history__header-actions">
+            <button id="exportText" class="secondary" type="button">Export Text</button>
+            <button id="exportJson" class="secondary" type="button">Export JSON</button>
+            <button id="clearHistory" class="secondary" type="button">Clear History</button>
+          </div>
         </div>
         <div id="transcriptHistory" class="history__list">
           <p class="history__empty">No transcripts saved yet.</p>

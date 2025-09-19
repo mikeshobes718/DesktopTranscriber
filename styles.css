@@ -244,6 +244,13 @@ button.secondary:hover:not(:disabled) {
   gap: 12px;
 }
 
+.history__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .history__list {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -267,7 +274,7 @@ button.secondary:hover:not(:disabled) {
 .history__item-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   font-size: 0.85rem;
   color: #475569;
 }
@@ -342,6 +349,35 @@ button.secondary:hover:not(:disabled) {
   color: #334155;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.history__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.history__reanswer {
+  border: none;
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.history__reanswer:hover:not(:disabled) {
+  background-color: rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+}
+
+.history__reanswer:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
 }
 
 .history__empty {

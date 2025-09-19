@@ -13,11 +13,15 @@ const knowledgeInput = document.getElementById("knowledgeInput");
 const saveKnowledgeButton = document.getElementById("saveKnowledge");
 const clearKnowledgeButton = document.getElementById("clearKnowledge");
 const knowledgeStatusText = document.getElementById("knowledgeStatus");
+const exportTextButton = document.getElementById("exportText");
+const exportJsonButton = document.getElementById("exportJson");
 
 const MAX_RECORDING_MS = 180_000;
 const LIVE_CHUNK_MS = 3_000;
 const LIVE_RETRY_DELAY_MS = 600;
-const MAX_KNOWLEDGE_CHARS = 5_000;
+const MAX_KNOWLEDGE_CHARS = 25_000;
+const KNOWLEDGE_SNIPPET_LIMIT = 1_200;
+const STATUS_RESET_DELAY_MS = 4_000;
 let mediaRecorder = null;
 let mediaStream = null;
 let recordingTimeout = null;
@@ -38,6 +42,17 @@ const KNOWLEDGE_STORAGE_KEY = "desktopTranscriber.knowledge";
 
 function setStatus(message) {
   statusText.textContent = message ?? "";
+}
+
+function showTransientStatus(message, duration = STATUS_RESET_DELAY_MS) {
+  setStatus(message);
+  if (message && duration > 0) {
+    window.setTimeout(() => {
+      if (statusText.textContent === message) {
+        setStatus("");
+      }
+    }, duration);
+  }
 }
 
 function setKeyStatus(message, tone = "info") {
@@ -128,8 +143,31 @@ function renderHistory() {
     timestamp.className = "history__timestamp";
     timestamp.textContent = formatTimestamp(entry.timestamp);
 
+    const meta = document.createElement("div");
+    meta.className = "history__meta";
+    meta.appendChild(timestamp);
+
+    if (entry.hasQuestions) {
+      const reanswerButton = document.createElement("button");
+      reanswerButton.type = "button";
+      reanswerButton.className = "history__reanswer";
+      reanswerButton.textContent = "Re-answer";
+      if (entry.pendingAnswers || !apiKeyAvailable) {
+        reanswerButton.disabled = true;
+      }
+      reanswerButton.addEventListener("click", () => {
+        if (!apiKeyAvailable) {
+          setKeyStatus("Add your OpenAI API key to generate answers.", "error");
+          return;
+        }
+        const latest = savedTranscripts.find((item) => item.id === entry.id) || entry;
+        maybeAnswerQuestions(latest, { force: true });
+      });
+      meta.appendChild(reanswerButton);
+    }
+
     header.appendChild(title);
-    header.appendChild(timestamp);
+    header.appendChild(meta);
 
     const body = document.createElement("p");
     body.className = "history__text";
@@ -138,7 +176,7 @@ function renderHistory() {
     card.appendChild(header);
     card.appendChild(body);
 
-    if (entry.knowledgeApplied && entry.knowledgeSnippet) {
+    if (entry.knowledgeApplied && (entry.knowledgeSnippet || entry.knowledgeFull)) {
       const knowledgeDetails = document.createElement("details");
       knowledgeDetails.className = "history__knowledge";
 
@@ -149,7 +187,10 @@ function renderHistory() {
       summary.textContent = `Knowledge base used (${knowledgeLength} chars)`;
 
       const knowledgeBody = document.createElement("p");
-      knowledgeBody.textContent = entry.knowledgeSnippet + (entry.knowledgeTruncated ? "…" : "");
+      const knowledgeSource = entry.knowledgeFull || entry.knowledgeSnippet || "";
+      const displaySnippet = knowledgeSource.slice(0, KNOWLEDGE_SNIPPET_LIMIT);
+      const truncated = entry.knowledgeTruncated || knowledgeSource.length > displaySnippet.length;
+      knowledgeBody.textContent = displaySnippet + (truncated ? "…" : "");
 
       knowledgeDetails.appendChild(summary);
       knowledgeDetails.appendChild(knowledgeBody);
@@ -211,8 +252,7 @@ function addTranscriptEntry(text) {
   if (!trimmed) return;
 
   const knowledgeTrimmed = knowledgeBase?.trim() ?? "";
-  const knowledgeSnippetLimit = 1_200;
-  const knowledgeSnippet = knowledgeTrimmed.slice(0, knowledgeSnippetLimit);
+  const knowledgeSnippet = knowledgeTrimmed.slice(0, KNOWLEDGE_SNIPPET_LIMIT);
 
   const entry = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -227,6 +267,7 @@ function addTranscriptEntry(text) {
     knowledgeSnippet,
     knowledgeLength: knowledgeTrimmed.length,
     knowledgeTruncated: knowledgeTrimmed.length > knowledgeSnippet.length,
+    knowledgeFull: knowledgeTrimmed,
   };
 
   savedTranscripts.unshift(entry);
@@ -266,15 +307,22 @@ function updateTranscriptEntry(id, updates) {
   return next;
 }
 
-async function maybeAnswerQuestions(entry) {
-  if (!entry?.id || !entry.hasQuestions || !apiKeyAvailable) {
+async function maybeAnswerQuestions(entry, options = {}) {
+  const { force = false } = options;
+  if (!entry?.id || (!entry.hasQuestions && !force) || !apiKeyAvailable) {
     return;
   }
 
+  const knowledgeTrimmed = knowledgeBase?.trim() ?? "";
   updateTranscriptEntry(entry.id, {
     pendingAnswers: true,
     answerError: null,
     answers: Array.isArray(entry.answers) ? entry.answers : [],
+    knowledgeApplied: Boolean(knowledgeTrimmed),
+    knowledgeSnippet: knowledgeTrimmed.slice(0, KNOWLEDGE_SNIPPET_LIMIT),
+    knowledgeLength: knowledgeTrimmed.length,
+    knowledgeTruncated: knowledgeTrimmed.length > KNOWLEDGE_SNIPPET_LIMIT,
+    knowledgeFull: knowledgeTrimmed,
   });
 
   try {
@@ -595,6 +643,7 @@ function handleClearKnowledge() {
     knowledgeInput.value = "";
   }
   setKnowledgeStatus("Knowledge cleared. Add new context when needed.");
+  handleKnowledgeInputChange();
 }
 
 function handleSaveKnowledge() {
@@ -633,6 +682,7 @@ function initializeKnowledge() {
         localStorage.setItem(KNOWLEDGE_STORAGE_KEY, knowledgeBase);
       }
       setKnowledgeStatus(`Knowledge loaded (${knowledgeBase.length.toLocaleString()} chars).`, "success");
+      handleKnowledgeInputChange();
       return;
     }
   } catch (error) {
@@ -643,11 +693,96 @@ function initializeKnowledge() {
     knowledgeInput.value = knowledgeBase;
   }
   setKnowledgeStatus("No knowledge base configured.");
+  handleKnowledgeInputChange();
+}
+
+function downloadFile(filename, data, mimeType) {
+  try {
+    const blob = new Blob([data], { type: `${mimeType};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    window.setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 0);
+  } catch (error) {
+    showTransientStatus("Unable to export history. Try again.", STATUS_RESET_DELAY_MS);
+  }
+}
+
+function exportHistoryAsText() {
+  if (!savedTranscripts.length) {
+    showTransientStatus("No transcripts to export.");
+    return;
+  }
+
+  const now = new Date();
+  const lines = [];
+  lines.push(`DesktopTranscriber export — ${now.toLocaleString()}`);
+  if (knowledgeBase?.trim()) {
+    lines.push("");
+    lines.push("Current Knowledge Base:");
+    lines.push(knowledgeBase.trim());
+  }
+
+  const ordered = [...savedTranscripts].reverse();
+  ordered.forEach((entry, index) => {
+    lines.push("");
+    lines.push("────────────────────────────────────────");
+    lines.push(`Recording ${index + 1} — ${formatTimestamp(entry.timestamp)}`);
+    lines.push("");
+    lines.push(entry.text);
+
+    if (entry.knowledgeApplied && (entry.knowledgeFull || entry.knowledgeSnippet)) {
+      lines.push("");
+      lines.push("Knowledge used:");
+      lines.push((entry.knowledgeFull || entry.knowledgeSnippet || "").trim());
+    }
+
+    if (Array.isArray(entry.answers) && entry.answers.length > 0) {
+      lines.push("");
+      lines.push("Questions & Answers:");
+      entry.answers.forEach((qa, qaIndex) => {
+        if (!qa) return;
+        lines.push(`${qaIndex + 1}. Q: ${qa.question}`);
+        lines.push(`   A: ${qa.answer}`);
+      });
+    }
+  });
+
+  const text = lines.join("\n");
+  const filename = `desktop-transcriber-${now.toISOString().replace(/[:.]/g, "-")}.txt`;
+  downloadFile(filename, text, "text/plain");
+  showTransientStatus("History exported as text.");
+}
+
+function exportHistoryAsJson() {
+  if (!savedTranscripts.length) {
+    showTransientStatus("No transcripts to export.");
+    return;
+  }
+
+  const now = new Date();
+  const payload = {
+    exportedAt: now.toISOString(),
+    knowledgeBase: knowledgeBase ?? "",
+    transcripts: savedTranscripts,
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const filename = `desktop-transcriber-${now.toISOString().replace(/[:.]/g, "-")}.json`;
+  downloadFile(filename, json, "application/json");
+  showTransientStatus("History exported as JSON.");
 }
 
 saveKnowledgeButton?.addEventListener("click", handleSaveKnowledge);
 clearKnowledgeButton?.addEventListener("click", handleClearKnowledge);
 knowledgeInput?.addEventListener("input", handleKnowledgeInputChange);
+exportTextButton?.addEventListener("click", exportHistoryAsText);
+exportJsonButton?.addEventListener("click", exportHistoryAsJson);
 
 initializeApiKey();
 initializeKnowledge();
@@ -685,6 +820,10 @@ function initializeTranscripts() {
               typeof entry?.knowledgeTruncated === "boolean"
                 ? entry.knowledgeTruncated
                 : knowledgeLength > knowledgeSnippet.length,
+            knowledgeFull:
+              typeof entry?.knowledgeFull === "string"
+                ? entry.knowledgeFull.slice(0, MAX_KNOWLEDGE_CHARS)
+                : knowledgeSnippet,
           };
         });
       }
