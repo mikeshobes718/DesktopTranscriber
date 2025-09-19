@@ -493,12 +493,21 @@ async function sendForTranscription(audioBlob) {
     );
 
     if (result?.ok) {
-      liveTranscriptOutput.textContent = result.text?.trim() || "No speech detected.";
+      const finalText = result.text?.trim();
+      if (finalText) {
+        liveTranscriptOutput.textContent = finalText;
+        liveTranscriptText = finalText;
+      } else if (liveTranscriptText) {
+        liveTranscriptOutput.textContent = liveTranscriptText;
+      } else {
+        liveTranscriptOutput.textContent = "No speech detected.";
+      }
       setStatus("Transcription complete.");
-      liveTranscriptText = liveTranscriptOutput.textContent;
       setKeyStatus("API key ready.", "success");
-      const entry = addTranscriptEntry(liveTranscriptText);
-      maybeAnswerQuestions(entry);
+      const entry = addTranscriptEntry(liveTranscriptText || "");
+      if (entry) {
+        maybeAnswerQuestions(entry);
+      }
     } else {
       const errorMessage = result?.error || "Transcription failed.";
       liveTranscriptOutput.textContent = errorMessage;
