@@ -9,11 +9,14 @@ if (!electron || typeof electron !== "object" || !electron.app) {
 const { app, BrowserWindow, ipcMain, dialog } = electron;
 const path = require("path");
 const OpenAI = require("openai");
+const { RealtimeTranscriptionSession } = require("./realtimeSession");
 
 const WINDOWS = new Set();
 
 let openAIClient = null;
 let openAIKey = process.env.OPENAI_API_KEY?.trim() || "";
+let realtimeSession = null;
+let realtimeWebContents = null;
 
 function toNodeBuffer(data) {
   if (!data) {
@@ -149,6 +152,9 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  if (realtimeSession) {
+    realtimeSession.stop();
+  }
   if (process.platform !== "darwin") {
     app.quit();
   }
@@ -167,6 +173,69 @@ ipcMain.handle("set-api-key", async (event, key) => {
 });
 
 ipcMain.handle("get-api-key-status", async () => ({ hasKey: Boolean(openAIKey) }));
+
+ipcMain.handle("realtime-start", async (event) => {
+  try {
+    if (!openAIKey) {
+      throw new Error("Missing OPENAI_API_KEY environment variable.");
+    }
+
+    if (realtimeSession) {
+      realtimeSession.stop();
+    }
+
+    const session = new RealtimeTranscriptionSession({
+      apiKey: openAIKey,
+      onPartial: (text) => {
+        if (realtimeWebContents && !realtimeWebContents.isDestroyed()) {
+          realtimeWebContents.send("realtime-transcript-update", { text });
+        }
+      },
+      onError: (error) => {
+        if (realtimeWebContents && !realtimeWebContents.isDestroyed()) {
+          realtimeWebContents.send("realtime-transcript-error", {
+            message: error?.message || "Realtime transcription error",
+          });
+        }
+      },
+    });
+
+    realtimeWebContents = event.sender;
+    await session.start();
+    realtimeSession = session;
+
+    return { ok: true };
+  } catch (error) {
+    realtimeSession = null;
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to start realtime session.",
+    };
+  }
+});
+
+ipcMain.handle("realtime-send-chunk", async (event, payload) => {
+  if (!realtimeSession) {
+    throw new Error("Realtime session not active.");
+  }
+
+  const arrayBuffer = payload?.buffer;
+  if (!arrayBuffer) {
+    throw new Error("Missing audio buffer.");
+  }
+
+  const buffer = Buffer.from(arrayBuffer);
+  await realtimeSession.sendChunk(buffer, payload?.mimeType);
+  return { ok: true };
+});
+
+ipcMain.handle("realtime-stop", async () => {
+  if (realtimeSession) {
+    realtimeSession.stop();
+  }
+  realtimeSession = null;
+  return { ok: true };
+});
 
 ipcMain.handle("transcribe-audio", async (event, payload) => {
   try {
