@@ -42,6 +42,15 @@ header p {
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+  position: sticky;
+  top: 16px;
+  z-index: 30;
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  padding: 14px 18px;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  margin-bottom: 18px;
 }
 
 .api-key {
