@@ -89,18 +89,7 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
     return [];
   }
 
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    // Attempt to recover by extracting JSON snippet
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      parsed = JSON.parse(match[0]);
-    } else {
-      throw new Error("Failed to parse AI response.");
-    }
-  }
+  const parsed = parseAnswerJson(text);
 
   if (!parsed || typeof parsed !== "object") {
     return [];
@@ -117,6 +106,38 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
       return { question, answer, source };
     })
     .filter(Boolean);
+}
+
+function parseAnswerJson(rawText) {
+  if (!rawText) {
+    return {};
+  }
+
+  const attempts = [];
+  attempts.push(rawText.trim());
+  attempts.push(
+    rawText
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```$/i, "")
+      .trim()
+  );
+
+  const braceMatch = rawText.match(/\{[\s\S]*\}/);
+  if (braceMatch) {
+    attempts.push(braceMatch[0].trim());
+  }
+
+  for (const candidate of attempts) {
+    if (!candidate) continue;
+    try {
+      return JSON.parse(candidate);
+    } catch (error) {
+      continue;
+    }
+  }
+
+  throw new Error("Failed to parse AI response.");
 }
 
 function createWindow() {
