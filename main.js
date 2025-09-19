@@ -60,6 +60,7 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
     "You are an assistant that extracts interview prompts from a transcript and answers them accurately. " +
     "Prompts may be phrased as questions or statements (for example, 'Tell me about your experience'). " +
     "Use any provided knowledge base when answering, but do not fabricate. " +
+    "If the knowledge base does not contain the requested information, reply with 'Not specified in knowledge base.' for that prompt. " +
     "Respond strictly as JSON with the shape {\"answers\":[{\"question\":string,\"answer\":string}]}. " +
     "If there are no prompts that require answers, respond with {\"answers\":[]}.";
 
@@ -70,7 +71,7 @@ async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
   }
   sections.push(`Transcript:\n${transcript}`);
   sections.push(
-    "Instructions: Identify each distinct question or request for information in the transcript and answer it concisely in one or two sentences."
+    "Instructions: Identify each distinct question or request for information in the transcript and answer it concisely in one or two sentences. Use the knowledge base when relevant; if information is missing, respond with 'Not specified in knowledge base.'"
   );
 
   const userPrompt = sections.join("\n\n");

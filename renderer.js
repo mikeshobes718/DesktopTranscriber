@@ -274,6 +274,11 @@ function renderHistory() {
       if (answersBlock.childElementCount > 0) {
         card.appendChild(answersBlock);
       }
+    } else {
+      const status = document.createElement("p");
+      status.className = "history__status";
+      status.textContent = "No answers generated yet.";
+      card.appendChild(status);
     }
 
     historyContainer.appendChild(card);
