@@ -6,7 +6,7 @@ DesktopTranscriber is an Electron-based macOS app that captures audio from the m
 
 - One-click recording with live transcription updates every few seconds
 - Final transcript persisted locally with timestamps and titles
-- Automatic question detection and concise answers via OpenAI Responses API
+- Automatic question detection and concise answers via OpenAI Responses API, enriched with an optional knowledge base
 - In-app API key management stored safely on the device (localStorage)
 - macOS bundle packaging via `@electron/packager`
 
@@ -29,7 +29,8 @@ Set your OpenAI key either as an environment variable before launching:
 export OPENAI_API_KEY="sk-..."
 ```
 
-or paste it into the app's API key field after the window loads.
+or paste it into the app's API key field after the window loads. You can also paste background material into the
+Knowledge Base panel so follow-up answers leverage your notes.
 
 ## Packaging Output
 

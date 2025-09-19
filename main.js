@@ -54,23 +54,30 @@ async function transcribePayload({ buffer, mimeType }) {
   });
 }
 
-async function answerQuestionsFromTranscript(transcript) {
+async function answerQuestionsFromTranscript(transcript, knowledgeBase = "") {
   const client = getClient();
   const systemPrompt =
     "You are an assistant that extracts questions from a transcript and answers them accurately. " +
-    "If there are no questions, respond with an empty array.";
-  const userPrompt = `Transcript:\n${transcript}`;
+    "Use any provided knowledge base when answering, but do not fabricate. " +
+    "Respond strictly as JSON with the shape {\"answers\":[{\"question\":string,\"answer\":string}]}. " +
+    "If there are no questions, respond with {\"answers\":[]}.";
+
+  const cleanedKnowledge = knowledgeBase ? knowledgeBase.slice(0, 8_000) : "";
+  const sections = [];
+  if (cleanedKnowledge) {
+    sections.push(`Knowledge Base:\n${cleanedKnowledge}`);
+  }
+  sections.push(`Transcript:\n${transcript}`);
+  sections.push(
+    "Instructions: Identify each distinct question in the transcript and answer it concisely in one or two sentences."
+  );
+
+  const userPrompt = sections.join("\n\n");
 
   const response = await client.responses.create({
     model: "gpt-4o-mini",
     input: [
       { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content:
-          "Identify every distinct question asked in the transcript and answer it concisely. " +
-          "Respond strictly as JSON with the shape {\"answers\":[{\"question\":string,\"answer\":string}]}.",
-      },
       { role: "user", content: userPrompt },
     ],
   });
@@ -180,13 +187,16 @@ ipcMain.handle("transcribe-partial", async (event, payload) => {
   }
 });
 
-ipcMain.handle("answer-questions", async (event, transcript) => {
+ipcMain.handle("answer-questions", async (event, payload) => {
   try {
-    if (typeof transcript !== "string" || !transcript.trim()) {
+    const transcript = typeof payload?.transcript === "string" ? payload.transcript.trim() : "";
+    const knowledgeBase = typeof payload?.knowledge === "string" ? payload.knowledge.trim() : "";
+
+    if (!transcript) {
       return { ok: true, answers: [] };
     }
 
-    const answers = await answerQuestionsFromTranscript(transcript.trim());
+    const answers = await answerQuestionsFromTranscript(transcript, knowledgeBase);
     return { ok: true, answers };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to generate answers.";

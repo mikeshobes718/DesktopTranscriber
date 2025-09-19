@@ -44,6 +44,25 @@
         <span id="keyStatus" class="status small"></span>
       </section>
 
+      <section class="knowledge">
+        <h2>Knowledge Base (optional)</h2>
+        <p>
+          Provide background context, policies, or notes to improve question answering. The text stays local and is
+          applied to all recordings until you clear it.
+        </p>
+        <textarea
+          id="knowledgeInput"
+          class="knowledge__textarea"
+          rows="6"
+          placeholder="Add meeting notes, FAQs, or other reference material..."
+        ></textarea>
+        <div class="knowledge__controls">
+          <button id="saveKnowledge" class="primary" type="button">Save Knowledge</button>
+          <button id="clearKnowledge" class="secondary" type="button">Clear Knowledge</button>
+          <span id="knowledgeStatus" class="status small"></span>
+        </div>
+      </section>
+
       <section class="transcript">
         <span class="label">Live Transcript</span>
         <p id="liveTranscriptOutput" class="output">Your transcript will appear here.</p>

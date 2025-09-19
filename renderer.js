@@ -9,10 +9,15 @@ const apiKeyInput = document.getElementById("apiKeyInput");
 const saveKeyButton = document.getElementById("saveKey");
 const clearKeyButton = document.getElementById("clearKey");
 const keyStatusText = document.getElementById("keyStatus");
+const knowledgeInput = document.getElementById("knowledgeInput");
+const saveKnowledgeButton = document.getElementById("saveKnowledge");
+const clearKnowledgeButton = document.getElementById("clearKnowledge");
+const knowledgeStatusText = document.getElementById("knowledgeStatus");
 
 const MAX_RECORDING_MS = 180_000;
 const LIVE_CHUNK_MS = 3_000;
 const LIVE_RETRY_DELAY_MS = 600;
+const MAX_KNOWLEDGE_CHARS = 5_000;
 let mediaRecorder = null;
 let mediaStream = null;
 let recordingTimeout = null;
@@ -25,9 +30,11 @@ let liveTranscriptText = "";
 let isStoppingRecord = false;
 let lastKnownMimeType = "audio/webm";
 let savedTranscripts = [];
+let knowledgeBase = "";
 
 const API_KEY_STORAGE_KEY = "desktopTranscriber.openaiKey";
 const TRANSCRIPTS_STORAGE_KEY = "desktopTranscriber.transcripts";
+const KNOWLEDGE_STORAGE_KEY = "desktopTranscriber.knowledge";
 
 function setStatus(message) {
   statusText.textContent = message ?? "";
@@ -42,6 +49,18 @@ function setKeyStatus(message, tone = "info") {
     keyStatusText.style.color = "#16a34a";
   } else {
     keyStatusText.style.color = "#1d4ed8";
+  }
+}
+
+function setKnowledgeStatus(message, tone = "info") {
+  if (!knowledgeStatusText) return;
+  knowledgeStatusText.textContent = message ?? "";
+  if (tone === "error") {
+    knowledgeStatusText.style.color = "#dc2626";
+  } else if (tone === "success") {
+    knowledgeStatusText.style.color = "#16a34a";
+  } else {
+    knowledgeStatusText.style.color = "#1d4ed8";
   }
 }
 
@@ -119,6 +138,29 @@ function renderHistory() {
     card.appendChild(header);
     card.appendChild(body);
 
+    if (entry.knowledgeApplied && entry.knowledgeSnippet) {
+      const knowledgeDetails = document.createElement("details");
+      knowledgeDetails.className = "history__knowledge";
+
+      const summary = document.createElement("summary");
+      const knowledgeLength = Number.isFinite(entry.knowledgeLength)
+        ? entry.knowledgeLength
+        : entry.knowledgeSnippet.length;
+      summary.textContent = `Knowledge base used (${knowledgeLength} chars)`;
+
+      const knowledgeBody = document.createElement("p");
+      knowledgeBody.textContent = entry.knowledgeSnippet + (entry.knowledgeTruncated ? "…" : "");
+
+      knowledgeDetails.appendChild(summary);
+      knowledgeDetails.appendChild(knowledgeBody);
+      card.appendChild(knowledgeDetails);
+    } else if (entry.knowledgeApplied) {
+      const badge = document.createElement("p");
+      badge.className = "history__status";
+      badge.textContent = "Knowledge base applied.";
+      card.appendChild(badge);
+    }
+
     if (entry.pendingAnswers) {
       const status = document.createElement("p");
       status.className = "history__status";
@@ -168,6 +210,10 @@ function addTranscriptEntry(text) {
   const trimmed = text?.trim();
   if (!trimmed) return;
 
+  const knowledgeTrimmed = knowledgeBase?.trim() ?? "";
+  const knowledgeSnippetLimit = 1_200;
+  const knowledgeSnippet = knowledgeTrimmed.slice(0, knowledgeSnippetLimit);
+
   const entry = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     timestamp: new Date().toISOString(),
@@ -177,6 +223,10 @@ function addTranscriptEntry(text) {
     pendingAnswers: false,
     answers: [],
     answerError: null,
+    knowledgeApplied: Boolean(knowledgeTrimmed),
+    knowledgeSnippet,
+    knowledgeLength: knowledgeTrimmed.length,
+    knowledgeTruncated: knowledgeTrimmed.length > knowledgeSnippet.length,
   };
 
   savedTranscripts.unshift(entry);
@@ -228,7 +278,11 @@ async function maybeAnswerQuestions(entry) {
   });
 
   try {
-    const result = await window.electronAPI.answerQuestions(entry.text);
+    const knowledgeTrimmed = knowledgeBase?.trim() ?? "";
+    const result = await window.electronAPI.answerQuestions({
+      transcript: entry.text,
+      knowledge: knowledgeTrimmed,
+    });
     if (result?.ok) {
       const answers = Array.isArray(result.answers) ? result.answers : [];
       updateTranscriptEntry(entry.id, {
@@ -518,7 +572,85 @@ saveKeyButton?.addEventListener("click", handleSaveKey);
 clearKeyButton?.addEventListener("click", handleClearKey);
 clearHistoryButton?.addEventListener("click", clearTranscriptHistory);
 
+function handleKnowledgeInputChange() {
+  if (!knowledgeInput) return;
+  const currentLength = knowledgeInput.value.length;
+  if (currentLength > MAX_KNOWLEDGE_CHARS) {
+    setKnowledgeStatus(
+      `Knowledge base is ${currentLength.toLocaleString()} characters — reduce to ${MAX_KNOWLEDGE_CHARS.toLocaleString()}.`,
+      "error"
+    );
+  } else {
+    setKnowledgeStatus(
+      `${currentLength.toLocaleString()} / ${MAX_KNOWLEDGE_CHARS.toLocaleString()} characters entered.`,
+      "info"
+    );
+  }
+}
+
+function handleClearKnowledge() {
+  knowledgeBase = "";
+  localStorage.removeItem(KNOWLEDGE_STORAGE_KEY);
+  if (knowledgeInput) {
+    knowledgeInput.value = "";
+  }
+  setKnowledgeStatus("Knowledge cleared. Add new context when needed.");
+}
+
+function handleSaveKnowledge() {
+  if (!knowledgeInput) return;
+  const raw = knowledgeInput.value ?? "";
+  const trimmed = raw.trim();
+
+  if (!trimmed) {
+    handleClearKnowledge();
+    return;
+  }
+
+  if (trimmed.length > MAX_KNOWLEDGE_CHARS) {
+    setKnowledgeStatus(
+      `Too long to save (${trimmed.length.toLocaleString()} chars). Limit is ${MAX_KNOWLEDGE_CHARS.toLocaleString()}.`,
+      "error"
+    );
+    return;
+  }
+
+  knowledgeBase = trimmed;
+  localStorage.setItem(KNOWLEDGE_STORAGE_KEY, knowledgeBase);
+  setKnowledgeStatus(`Knowledge saved (${knowledgeBase.length.toLocaleString()} chars).`, "success");
+}
+
+function initializeKnowledge() {
+  try {
+    const stored = localStorage.getItem(KNOWLEDGE_STORAGE_KEY);
+    if (stored) {
+      const trimmed = stored.trim();
+      knowledgeBase = trimmed.slice(0, MAX_KNOWLEDGE_CHARS);
+      if (knowledgeInput) {
+        knowledgeInput.value = knowledgeBase;
+      }
+      if (stored.length > MAX_KNOWLEDGE_CHARS) {
+        localStorage.setItem(KNOWLEDGE_STORAGE_KEY, knowledgeBase);
+      }
+      setKnowledgeStatus(`Knowledge loaded (${knowledgeBase.length.toLocaleString()} chars).`, "success");
+      return;
+    }
+  } catch (error) {
+    knowledgeBase = "";
+  }
+
+  if (knowledgeInput) {
+    knowledgeInput.value = knowledgeBase;
+  }
+  setKnowledgeStatus("No knowledge base configured.");
+}
+
+saveKnowledgeButton?.addEventListener("click", handleSaveKnowledge);
+clearKnowledgeButton?.addEventListener("click", handleClearKnowledge);
+knowledgeInput?.addEventListener("input", handleKnowledgeInputChange);
+
 initializeApiKey();
+initializeKnowledge();
 initializeTranscripts();
 
 function initializeTranscripts() {
@@ -529,6 +661,10 @@ function initializeTranscripts() {
       if (Array.isArray(parsed)) {
         savedTranscripts = parsed.map((entry, index) => {
           const text = typeof entry?.text === "string" ? entry.text : "";
+          const knowledgeSnippet = typeof entry?.knowledgeSnippet === "string" ? entry.knowledgeSnippet : "";
+          const knowledgeLength = Number.isFinite(entry?.knowledgeLength)
+            ? entry.knowledgeLength
+            : knowledgeSnippet.length;
           return {
             id: entry?.id || `${Date.now()}-${index}`,
             timestamp: entry?.timestamp || new Date().toISOString(),
@@ -539,6 +675,16 @@ function initializeTranscripts() {
             pendingAnswers: Boolean(entry?.pendingAnswers),
             answers: Array.isArray(entry?.answers) ? entry.answers : [],
             answerError: typeof entry?.answerError === "string" ? entry.answerError : null,
+            knowledgeApplied:
+              typeof entry?.knowledgeApplied === "boolean"
+                ? entry.knowledgeApplied
+                : Boolean(knowledgeSnippet || knowledgeLength),
+            knowledgeSnippet,
+            knowledgeLength,
+            knowledgeTruncated:
+              typeof entry?.knowledgeTruncated === "boolean"
+                ? entry.knowledgeTruncated
+                : knowledgeLength > knowledgeSnippet.length,
           };
         });
       }

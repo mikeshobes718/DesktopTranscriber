@@ -89,6 +89,49 @@ input[type="password"]:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
 }
 
+.knowledge {
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  background: rgba(224, 231, 255, 0.4);
+  border-radius: 20px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.knowledge p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.knowledge__textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 140px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  padding: 14px 16px;
+  font-size: 0.96rem;
+  color: #0f172a;
+  font-family: inherit;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.knowledge__textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+.knowledge__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
 button {
   border: none;
   border-radius: 999px;
@@ -277,6 +320,28 @@ button.secondary:hover:not(:disabled) {
 
 .history__status--error {
   color: #dc2626;
+}
+
+.history__knowledge {
+  margin-top: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 14px;
+  background-color: rgba(241, 245, 249, 0.6);
+  padding: 10px 14px;
+}
+
+.history__knowledge summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #1d4ed8;
+  margin-bottom: 6px;
+}
+
+.history__knowledge p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .history__empty {

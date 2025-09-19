@@ -7,8 +7,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   transcribePartial(buffer, mimeType) {
     return ipcRenderer.invoke("transcribe-partial", { buffer, mimeType });
   },
-  answerQuestions(transcript) {
-    return ipcRenderer.invoke("answer-questions", transcript);
+  answerQuestions(payload) {
+    return ipcRenderer.invoke("answer-questions", payload);
   },
   setApiKey(value) {
     return ipcRenderer.invoke("set-api-key", value);
