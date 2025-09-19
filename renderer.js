@@ -33,24 +33,8 @@ let isStoppingRecord = false;
 let lastKnownMimeType = "audio/webm";
 let savedTranscripts = [];
 let knowledgeBase = "";
-let realtimeActive = false;
-let realtimeInitialized = false;
 const liveChunkQueue = [];
 let isProcessingLiveChunk = false;
-
-window.electronAPI.onRealtimeTranscript((payload) => {
-  const text = typeof payload?.text === "string" ? payload.text : "";
-  if (!text) return;
-  realtimeActive = true;
-  liveTranscriptText = text;
-  liveTranscriptOutput.textContent = text;
-});
-
-window.electronAPI.onRealtimeError((payload) => {
-  const message = payload?.message || "Realtime transcription error.";
-  fallbackRealtime(message);
-  processLiveChunkQueue();
-});
 
 const API_KEY_STORAGE_KEY = "desktopTranscriber.openaiKey";
 const TRANSCRIPTS_STORAGE_KEY = "desktopTranscriber.transcripts";
@@ -437,26 +421,6 @@ function enqueueLiveChunk(blob) {
   if (!blob || !blob.size || isStoppingRecord) {
     return;
   }
-  if (realtimeActive) {
-    blob
-      .arrayBuffer()
-      .then((buffer) =>
-        window.electronAPI
-          .sendRealtimeChunk(buffer, blob.type)
-          .catch(() => {
-            fallbackRealtime("Realtime transcription unavailable. Falling back to standard mode.");
-            liveChunkQueue.push(new Blob([buffer], { type: blob.type }));
-            processLiveChunkQueue();
-          })
-      )
-      .catch(() => {
-        fallbackRealtime();
-        liveChunkQueue.push(blob);
-        processLiveChunkQueue();
-      });
-    return;
-  }
-
   liveChunkQueue.push(blob);
   processLiveChunkQueue();
 }
@@ -503,15 +467,6 @@ async function processLiveChunkQueue() {
     if (liveChunkQueue.length && !isStoppingRecord) {
       setTimeout(processLiveChunkQueue, LIVE_RETRY_DELAY_MS);
     }
-  }
-}
-
-function fallbackRealtime(message) {
-  if (!realtimeActive) return;
-  realtimeActive = false;
-  window.electronAPI.stopRealtime().catch(() => undefined);
-  if (message) {
-    showTransientStatus(message);
   }
 }
 
@@ -578,22 +533,6 @@ async function startRecording() {
     lastKnownMimeType = "audio/webm";
     liveTranscriptOutput.textContent = "Listening…";
 
-    realtimeActive = false;
-    realtimeInitialized = false;
-    if (apiKeyAvailable) {
-      try {
-        const result = await window.electronAPI.startRealtime();
-        realtimeActive = Boolean(result?.ok);
-        realtimeInitialized = realtimeActive;
-        if (!realtimeActive && result?.error) {
-          showTransientStatus("Realtime unavailable; using standard mode.");
-        }
-      } catch (error) {
-        realtimeActive = false;
-        showTransientStatus("Realtime unavailable; using standard mode.");
-      }
-    }
-
     mediaRecorder.addEventListener("dataavailable", (event) => {
       if (event.data && event.data.size > 0) {
         chunks.push(event.data);
@@ -609,10 +548,6 @@ async function startRecording() {
         setStatus("No audio captured.");
         setButtons({ recording: false, processing: false });
         return;
-      }
-
-      if (realtimeInitialized) {
-        fallbackRealtime();
       }
 
       const audioBlob = new Blob(chunks, { type: chunks[0]?.type || "audio/webm" });
@@ -657,7 +592,6 @@ resetButton.addEventListener("click", resetTranscript);
 
 window.addEventListener("beforeunload", () => {
   resetState();
-  fallbackRealtime();
 });
 
 async function initializeApiKey() {
