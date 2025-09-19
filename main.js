@@ -51,6 +51,8 @@ async function transcribePayload({ buffer, mimeType }) {
   return client.audio.transcriptions.create({
     model: "gpt-4o-mini-transcribe",
     file,
+    language: "en",
+    response_format: "text",
   });
 }
 
