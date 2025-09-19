@@ -53,6 +53,45 @@ header p {
   margin-bottom: 18px;
 }
 
+.language-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(226, 232, 240, 0.5);
+  border-radius: 999px;
+}
+
+.language-toggle__label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #475569;
+}
+
+.language-toggle__btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: rgba(148, 163, 184, 0.25);
+  color: #1f2937;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.language-toggle__btn:hover:not(:disabled) {
+  background-color: rgba(99, 102, 241, 0.2);
+  transform: translateY(-1px);
+}
+
+.language-toggle__btn.is-active {
+  background-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);
+}
+
 .api-key {
   border: 1px solid rgba(99, 102, 241, 0.15);
   background-color: rgba(239, 246, 255, 0.6);

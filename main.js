@@ -41,18 +41,25 @@ function getClient() {
   return openAIClient;
 }
 
-async function transcribePayload({ buffer, mimeType }) {
+async function transcribePayload({ buffer, mimeType, language }) {
   const client = getClient();
   const nodeBuffer = toNodeBuffer(buffer);
   const file = await OpenAI.toFile(nodeBuffer, "recording.webm", {
     type: mimeType || "audio/webm",
   });
 
-  return client.audio.transcriptions.create({
+  const options = {
     model: "gpt-4o-mini-transcribe",
     file,
-    language: "en",
     response_format: "text",
+  };
+
+  if (language && language !== "auto") {
+    options.language = language;
+  }
+
+  return client.audio.transcriptions.create({
+    ...options,
   });
 }
 

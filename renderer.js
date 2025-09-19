@@ -15,6 +15,8 @@ const clearKnowledgeButton = document.getElementById("clearKnowledge");
 const knowledgeStatusText = document.getElementById("knowledgeStatus");
 const exportTextButton = document.getElementById("exportText");
 const exportJsonButton = document.getElementById("exportJson");
+const languageEnglishButton = document.getElementById("languageEnglish");
+const languageAutoButton = document.getElementById("languageAuto");
 
 const MAX_RECORDING_MS = 180_000;
 const LIVE_CHUNK_MS = 1_000;
@@ -35,10 +37,12 @@ let savedTranscripts = [];
 let knowledgeBase = "";
 const liveChunkQueue = [];
 let isProcessingLiveChunk = false;
+let transcriptionLanguage = "en";
 
 const API_KEY_STORAGE_KEY = "desktopTranscriber.openaiKey";
 const TRANSCRIPTS_STORAGE_KEY = "desktopTranscriber.transcripts";
 const KNOWLEDGE_STORAGE_KEY = "desktopTranscriber.knowledge";
+const LANGUAGE_STORAGE_KEY = "desktopTranscriber.languageMode";
 
 function looksLikeQuestion(text) {
   if (!text) return false;
@@ -444,7 +448,11 @@ async function processLiveChunkQueue() {
 
   try {
     const buffer = await blob.arrayBuffer();
-    const result = await window.electronAPI.transcribePartial(buffer, blob.type);
+    const result = await window.electronAPI.transcribePartial(
+      buffer,
+      blob.type,
+      transcriptionLanguage
+    );
 
     if (result?.ok) {
       const text = result.text?.trim();
@@ -478,7 +486,11 @@ async function sendForTranscription(audioBlob) {
     liveTranscriptOutput.textContent = "Waiting for transcription…";
 
     const buffer = await audioBlob.arrayBuffer();
-    const result = await window.electronAPI.transcribe(buffer, audioBlob.type);
+    const result = await window.electronAPI.transcribe(
+      buffer,
+      audioBlob.type,
+      transcriptionLanguage
+    );
 
     if (result?.ok) {
       liveTranscriptOutput.textContent = result.text?.trim() || "No speech detected.";
@@ -822,14 +834,51 @@ function exportHistoryAsJson() {
   showTransientStatus("History exported as JSON.");
 }
 
+function updateLanguageButtons() {
+  const englishActive = transcriptionLanguage !== "auto";
+  if (languageEnglishButton) {
+    languageEnglishButton.classList.toggle("is-active", englishActive);
+  }
+  if (languageAutoButton) {
+    languageAutoButton.classList.toggle("is-active", !englishActive);
+  }
+}
+
+function setLanguageMode(mode) {
+  transcriptionLanguage = mode === "auto" ? "auto" : "en";
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, transcriptionLanguage);
+  updateLanguageButtons();
+  showTransientStatus(
+    transcriptionLanguage === "auto"
+      ? "Language set to auto-detect."
+      : "Language locked to English."
+  );
+}
+
+function initializeLanguage() {
+  try {
+    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (stored === "auto" || stored === "en") {
+      transcriptionLanguage = stored;
+    }
+  } catch (error) {
+    transcriptionLanguage = "en";
+  }
+
+  updateLanguageButtons();
+}
+
 saveKnowledgeButton?.addEventListener("click", handleSaveKnowledge);
 clearKnowledgeButton?.addEventListener("click", handleClearKnowledge);
 knowledgeInput?.addEventListener("input", handleKnowledgeInputChange);
 exportTextButton?.addEventListener("click", exportHistoryAsText);
 exportJsonButton?.addEventListener("click", exportHistoryAsJson);
+languageEnglishButton?.addEventListener("click", () => setLanguageMode("en"));
+languageAutoButton?.addEventListener("click", () => setLanguageMode("auto"));
 
 initializeApiKey();
 initializeKnowledge();
+initializeLanguage();
 initializeTranscripts();
 
 function initializeTranscripts() {
