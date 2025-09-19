@@ -4,7 +4,7 @@ DesktopTranscriber is an Electron-based macOS app that captures audio from the m
 
 ## Features
 
-- One-click recording with live transcription updates every few seconds
+- One-click recording with live transcription updates every few seconds (English by default with an Auto toggle)
 - Final transcript persisted locally with timestamps and titles
 - Automatic question detection and concise answers via OpenAI Responses API, enriched with an optional 25k-character knowledge base
 - Export saved transcripts to text or JSON and re-run answers with the latest knowledge
