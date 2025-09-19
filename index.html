@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Desktop Live Transcription</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>Desktop Live Transcription</h1>
+        <p>
+          Press <strong>Listen</strong> to capture a short clip from your microphone. Audio never leaves your
+          machine except for transcription via OpenAI when you stop recording.
+        </p>
+      </header>
+
+      <section class="controls">
+        <button id="listen" class="primary">Listen</button>
+        <button id="stop" class="danger" disabled>Stop</button>
+        <button id="reset" disabled>Reset</button>
+        <span id="status" class="status"></span>
+      </section>
+
+      <section class="api-key">
+        <h2>OpenAI API Key</h2>
+        <p>
+          Paste your API key below. It is stored locally on this device and shared only with OpenAI when a
+          transcription request is made.
+        </p>
+        <div class="api-key__controls">
+          <input
+            type="password"
+            id="apiKeyInput"
+            placeholder="sk-..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="saveKey" class="primary">Save Key</button>
+          <button id="clearKey" class="secondary">Clear</button>
+        </div>
+        <span id="keyStatus" class="status small"></span>
+      </section>
+
+      <section class="transcript">
+        <span class="label">Live Transcript</span>
+        <p id="liveTranscriptOutput" class="output">Your transcript will appear here.</p>
+      </section>
+
+      <section class="history">
+        <div class="history__header">
+          <span class="label">Saved Transcripts</span>
+          <button id="clearHistory" class="secondary" type="button">Clear History</button>
+        </div>
+        <div id="transcriptHistory" class="history__list">
+          <p class="history__empty">No transcripts saved yet.</p>
+        </div>
+      </section>
+
+      <section class="note">
+        <h2>Before you start</h2>
+        <ul>
+          <li>Set <code>OPENAI_API_KEY</code> in your environment before launching the app.</li>
+          <li>Grant microphone permission when the system prompts you.</li>
+          <li>Recordings are limited to 3 minutes to avoid large uploads.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

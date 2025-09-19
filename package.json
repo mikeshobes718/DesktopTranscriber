@@ -1,0 +1,26 @@
+{
+  "name": "desktop-transcriber",
+  "productName": "DesktopTranscriber",
+  "version": "1.0.0",
+  "description": "Microphone transcription desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package:mac": "node scripts/package-mac.cjs"
+  },
+  "keywords": [
+    "electron",
+    "transcription",
+    "openai"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "electron": "^38.1.2",
+    "openai": "^5.21.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.4.4"
+  }
+}
